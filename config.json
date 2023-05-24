@@ -1,0 +1,13 @@
+{
+    "player": "🐈‍",
+    "ghost": "🐕‍🦺",
+    "wall": "🌳",
+    "dot": "🥩",
+    "pill": "🐟",
+    "death": "💀",
+    "space": "  ",
+    "use_emoji": true,
+    "ghost_blue": "🐁",
+    "pillTim" : 10
+
+}

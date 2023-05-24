@@ -1,13 +1,12 @@
 {
-    "player": "🐈‍",
-    "ghost": "🐕‍🦺",
-    "wall": "🌳",
-    "dot": "🥩",
-    "pill": "🐟",
+    "player": "🤖",
+    "ghost": "👽",
+    "ghost_blue": "😱",
+    "wall": "🟪",
+    "dot": "▫️ ",
+    "pill": "🔫",
     "death": "💀",
     "space": "  ",
     "use_emoji": true,
-    "ghost_blue": "🐁",
-    "pillTim" : 10
-
+    "pill_duration_secs": 10
 }

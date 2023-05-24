@@ -1,0 +1,14 @@
+{
+    "player": "🐈‍",
+    "maxLifestate": 3,
+    "enemy": "🐕",
+    "wall": "🌳",
+    "dot": "🥩",
+    "pill": "🐟",
+    "death": "💀",
+    "space": "  ",
+    "use_emoji": true,
+    "anti_enemy": "🐁",
+    "pillTim" : 10
+
+}

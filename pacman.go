@@ -13,7 +13,7 @@ import (
 	"strconv"
 	"sync"
 	"time"
-
+	//tm "github.com/buger/goterm"
 	"github.com/danicat/simpleansi"
 )
 
@@ -395,7 +395,8 @@ func main() {
 				}
 			}
 		}
-
+		//clear terminal
+		fmt.Print("\033[H\033[2J")
 		// update screen
 		printScreen()
 

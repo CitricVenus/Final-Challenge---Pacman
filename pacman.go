@@ -317,6 +317,14 @@ func cleanup() {
 	}
 }
 
+func printCounter(wait int){
+	for i:= 0; i< wait; i++{
+		time.Sleep(750 * time.Millisecond)
+		fmt.Println("RESTARTING in " + strconv.Itoa(3-i) + " seconds")
+	}
+}
+
+
 func main() {
 	flag.Parse()
 
@@ -385,7 +393,8 @@ func main() {
 						moveCursor(len(maze)+2, 0)
 						ghostsStatusMx.RUnlock()
 						updateGhosts(ghosts, GhostStatusNormal)
-						time.Sleep(1000 * time.Millisecond) //dramatic pause before reseting player position
+						go printCounter(3)
+						time.Sleep(3000 * time.Millisecond) //dramatic pause before reseting player position
 						player.row, player.col = player.startRow, player.startCol
 					}
 				} else if g.status == GhostStatusBlue {

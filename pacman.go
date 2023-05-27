@@ -259,6 +259,7 @@ func updateGhosts(ghosts []*ghost, ghostStatus GhostStatus) {
 	defer ghostsStatusMx.Unlock()
 	for _, g := range ghosts {
 		g.status = ghostStatus
+		g.position.row, g.position.col = g.position.startRow, g.position.startCol
 	}
 }
 

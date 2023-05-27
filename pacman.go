@@ -63,7 +63,7 @@ var ghosts []*ghost
 var maze []string
 var score int
 var numDots int
-var lives = 3
+var lifes = 3
 
 func loadConfig(file string) error {
 	f, err := os.Open(file)
@@ -156,18 +156,18 @@ func printScreen() {
 
 	moveCursor(len(maze)+1, 0)
 
-	livesRemaining := strconv.Itoa(lives) //converts lives int to a string
+	lifesRemaining := strconv.Itoa(lifes) //converts lifes int to a string
 	if cfg.UseEmoji {
-		livesRemaining = getLivesAsEmoji()
+		lifesRemaining = getlifesAsEmoji()
 	}
 
-	fmt.Println("Score:", score, "\tLives:", livesRemaining)
+	fmt.Println("Score:", score, "\tlifes:", lifesRemaining)
 }
 
-// concatenate the correct number of player emojis based on lives
-func getLivesAsEmoji() string {
+// concatenate the correct number of player emojis based on lifes
+func getlifesAsEmoji() string {
 	buf := bytes.Buffer{}
-	for i := lives; i > 0; i-- {
+	for i := lifes; i > 0; i-- {
 		buf.WriteString(cfg.Player)
 	}
 	return buf.String()
@@ -373,7 +373,7 @@ func main() {
 		select {
 		case inp := <-input:
 			if inp == "ESC" {
-				lives = 0
+				lifes = 0
 			}
 			movePlayer(inp)
 		default:
@@ -386,8 +386,8 @@ func main() {
 			if player.row == g.position.row && player.col == g.position.col {
 				ghostsStatusMx.RLock()
 				if g.status == GhostStatusNormal {
-					lives = lives - 1
-					if lives != 0 {
+					lifes = lifes - 1
+					if lifes != 0 {
 						moveCursor(player.row, player.col)
 						fmt.Print(cfg.Death)
 						moveCursor(len(maze)+2, 0)
@@ -410,8 +410,8 @@ func main() {
 		printScreen()
 
 		// check game over
-		if numDots == 0 || lives <= 0 {
-			if lives == 0 {
+		if numDots == 0 || lifes <= 0 {
+			if lifes == 0 {
 				moveCursor(player.row, player.col)
 				fmt.Print(cfg.Death)
 				moveCursor(player.startRow, player.startCol-1)

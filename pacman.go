@@ -419,6 +419,9 @@ func main() {
 				fmt.Print("GAME OVER")
 				moveCursor(len(maze)+2, 0)
 			}
+			if numDots == 0{
+				fmt.Println("Victory")
+			}
 			break
 		}
 

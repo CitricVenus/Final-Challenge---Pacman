@@ -49,8 +49,8 @@ var pillMx sync.Mutex
 
 type config struct {
 	Player           string        `json:"player"`
-	Ghost            string        `json:"ghost"`
-	GhostBlue        string        `json:"ghost_blue"`
+	Enemies          string        `json:"Enemies"`
+	EnemiesBlue      string        `json:"Enemies_blue"`
 	Wall             string        `json:"wall"`
 	Dot              string        `json:"dot"`
 	Pill             string        `json:"pill"`
@@ -316,9 +316,9 @@ func printScreen() {
 	for _, g := range enemies {
 		moveCursor(g.position.row, g.position.col)
 		if g.status == EnemyStatusNormal {
-			fmt.Printf(cfg.Ghost)
+			fmt.Printf(cfg.Enemies)
 		} else if g.status == EnemyStatusBlue {
-			fmt.Printf(cfg.GhostBlue)
+			fmt.Printf(cfg.EnemiesBlue)
 		}
 	}
 	enemiesStatusMx.RUnlock()

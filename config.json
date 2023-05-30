@@ -1,7 +1,7 @@
 {
     "player": "🤖",
-    "ghost": "👽",
-    "ghost_blue": "😱",
+    "Enemies": "👽",
+    "Enemies_blue": "😱",
     "wall": "🟪",
     "dot": "▫️ ",
     "pill": "🔫",

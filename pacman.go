@@ -13,15 +13,18 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
 	//tm "github.com/buger/goterm"
 	"github.com/danicat/simpleansi"
 )
 
+// Se obtiene la configuración del json y el nombre del archivo del mapa/laberinto
 var (
 	configFile = flag.String("config-file", "config.json", "path to custom configuration file")
 	mazeFile   = flag.String("maze-file", "maze01.txt", "path to a custom maze file")
 )
 
+// Informacion del movimiento anterior y actual
 type sprite struct {
 	row      int
 	col      int
@@ -29,19 +32,19 @@ type sprite struct {
 	startCol int
 }
 
-type ghost struct {
+type enemieStruct struct {
 	position sprite
-	status   GhostStatus
+	status   EnemieStatus
 }
 
-type GhostStatus string
+type EnemieStatus string
 
 const (
-	GhostStatusNormal GhostStatus = "Normal"
-	GhostStatusBlue   GhostStatus = "Blue"
+	EnemyStatusNormal EnemieStatus = "Normal"
+	EnemyStatusBlue   EnemieStatus = "Blue"
 )
 
-var ghostsStatusMx sync.RWMutex
+var enemiesStatusMx sync.RWMutex
 var pillMx sync.Mutex
 
 type config struct {
@@ -57,15 +60,15 @@ type config struct {
 	PillDurationSecs time.Duration `json:"pill_duration_secs"`
 }
 
+var enemies []*enemieStruct
+var score int
 var cfg config
 var player sprite
-var ghosts []*ghost
-var maze []string
-var score int
-var numDots int
+var maze_level []string
 var lives = 3
+var numDots int
 
-func loadConfig(file string) error {
+func loadGame(file string) error {
 	f, err := os.Open(file)
 	if err != nil {
 		return err
@@ -81,7 +84,8 @@ func loadConfig(file string) error {
 	return nil
 }
 
-func loadMaze(file string,numenemy int) error {
+// Lee el archivo del mapa/laberinto
+func loadLevelMap(file string, numenemy int) error {
 	f, err := os.Open(file)
 	if err != nil {
 		return err
@@ -91,18 +95,18 @@ func loadMaze(file string,numenemy int) error {
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		line := scanner.Text()
-		maze = append(maze, line)
+		maze_level = append(maze_level, line)
 	}
 
 	var aux int = 0
-	for row, line := range maze {
+	for row, line := range maze_level {
 		for col, char := range line {
 			switch char {
 			case 'P':
 				player = sprite{row, col, row, col}
 			case 'G':
 				if aux < numenemy {
-					ghosts = append(ghosts, &ghost{sprite{row, col, row, col}, GhostStatusNormal})
+					enemies = append(enemies, &enemieStruct{sprite{row, col, row, col}, EnemyStatusNormal})
 					aux++
 				}
 			case '.':
@@ -114,6 +118,17 @@ func loadMaze(file string,numenemy int) error {
 	return nil
 }
 
+// Se hace la configuracion para poder obtener el input de las teclas en la terminal
+func initialiseGame() {
+	cbTerm := exec.Command("stty", "cbreak", "-echo")
+	cbTerm.Stdin = os.Stdin
+
+	err := cbTerm.Run()
+	if err != nil {
+		log.Fatalln("unable to activate cbreak mode:", err)
+	}
+}
+
 func moveCursor(row, col int) {
 	if cfg.UseEmoji {
 		simpleansi.MoveCursor(row, col*2)
@@ -122,50 +137,8 @@ func moveCursor(row, col int) {
 	}
 }
 
-func printScreen() {
-	simpleansi.ClearScreen()
-	for _, line := range maze {
-		for _, chr := range line {
-			switch chr {
-			case '#':
-				fmt.Print(simpleansi.WithBlueBackground(cfg.Wall))
-			case '.':
-				fmt.Print(cfg.Dot)
-			case 'X':
-				fmt.Print(cfg.Pill)
-			default:
-				fmt.Print(cfg.Space)
-			}
-		}
-		fmt.Println()
-	}
-
-	moveCursor(player.row, player.col)
-	fmt.Print(cfg.Player)
-
-	ghostsStatusMx.RLock()
-	for _, g := range ghosts {
-		moveCursor(g.position.row, g.position.col)
-		if g.status == GhostStatusNormal {
-			fmt.Printf(cfg.Ghost)
-		} else if g.status == GhostStatusBlue {
-			fmt.Printf(cfg.GhostBlue)
-		}
-	}
-	ghostsStatusMx.RUnlock()
-
-	moveCursor(len(maze)+1, 0)
-
-	livesRemaining := strconv.Itoa(lives) //converts lives int to a string
-	if cfg.UseEmoji {
-		livesRemaining = getlivesAsEmoji()
-	}
-
-	fmt.Println("Score:", score, "\tlives:", livesRemaining)
-}
-
-// concatenate the correct number of player emojis based on lives
-func getlivesAsEmoji() string {
+// Muesra las vidas del jugador
+func showLives() string {
 	buf := bytes.Buffer{}
 	for i := lives; i > 0; i-- {
 		buf.WriteString(cfg.Player)
@@ -173,6 +146,7 @@ func getlivesAsEmoji() string {
 	return buf.String()
 }
 
+// Lee el input del teclado que se envia, en este caso las teclas de las flechas
 func readInput() (string, error) {
 	buffer := make([]byte, 100)
 
@@ -201,33 +175,33 @@ func readInput() (string, error) {
 	return "", nil
 }
 
-func makeMove(oldRow, oldCol int, dir string) (newRow, newCol int) {
+func move(oldRow, oldCol int, dir string) (newRow, newCol int) {
 	newRow, newCol = oldRow, oldCol
 
 	switch dir {
 	case "UP":
 		newRow = newRow - 1
 		if newRow < 0 {
-			newRow = len(maze) - 1
+			newRow = len(maze_level) - 1
 		}
 	case "DOWN":
 		newRow = newRow + 1
-		if newRow == len(maze)-1 {
+		if newRow == len(maze_level)-1 {
 			newRow = 0
 		}
 	case "RIGHT":
 		newCol = newCol + 1
-		if newCol == len(maze[0]) {
+		if newCol == len(maze_level[0]) {
 			newCol = 0
 		}
 	case "LEFT":
 		newCol = newCol - 1
 		if newCol < 0 {
-			newCol = len(maze[0]) - 1
+			newCol = len(maze_level[0]) - 1
 		}
 	}
 
-	if maze[newRow][newCol] == '#' {
+	if maze_level[newRow][newCol] == '#' {
 		newRow = oldRow
 		newCol = oldCol
 	}
@@ -235,14 +209,15 @@ func makeMove(oldRow, oldCol int, dir string) (newRow, newCol int) {
 	return
 }
 
+// Mueve al jugador dentro del laberinto
 func movePlayer(dir string) {
-	player.row, player.col = makeMove(player.row, player.col, dir)
+	player.row, player.col = move(player.row, player.col, dir)
 
 	removeDot := func(row, col int) {
-		maze[row] = maze[row][0:col] + " " + maze[row][col+1:]
+		maze_level[row] = maze_level[row][0:col] + " " + maze_level[row][col+1:]
 	}
 
-	switch maze[player.row][player.col] {
+	switch maze_level[player.row][player.col] {
 	case '.':
 		numDots--
 		score++
@@ -250,38 +225,11 @@ func movePlayer(dir string) {
 	case 'X':
 		score += 10
 		removeDot(player.row, player.col)
-		go processPill()
+		go power()
 	}
 }
-
-func updateGhosts(ghosts []*ghost, ghostStatus GhostStatus) {
-	ghostsStatusMx.Lock()
-	defer ghostsStatusMx.Unlock()
-	for _, g := range ghosts {
-		g.status = ghostStatus
-		g.position.row, g.position.col = g.position.startRow, g.position.startCol
-	}
-}
-
-var pillTimer *time.Timer
-
-func processPill() {
-	pillMx.Lock()
-	updateGhosts(ghosts, GhostStatusBlue)
-	if pillTimer != nil {
-		pillTimer.Stop()
-	}
-	pillTimer = time.NewTimer(time.Second * cfg.PillDurationSecs)
-	pillMx.Unlock()
-	<-pillTimer.C
-	pillMx.Lock()
-	pillTimer.Stop()
-	updateGhosts(ghosts, GhostStatusNormal)
-	pillMx.Unlock()
-}
-
-func drawDirection() string {
-	dir := rand.Intn(4)
+func enemyMoveListDirection() string {
+	dir := rand.Intn(8)
 	move := map[int]string{
 		0: "UP",
 		1: "DOWN",
@@ -291,24 +239,50 @@ func drawDirection() string {
 	return move[dir]
 }
 
-func moveGhosts() {
-	for _, g := range ghosts {
-		dir := drawDirection()
-		g.position.row, g.position.col = makeMove(g.position.row, g.position.col, dir)
+// Actualiza la posicion de los enemigos
+func updateEnemies(enemies []*enemieStruct, enemieStatus EnemieStatus) {
+	enemiesStatusMx.Lock()
+	defer enemiesStatusMx.Unlock()
+	for _, g := range enemies {
+		g.status = enemieStatus
+		//g.position.row, g.position.col = g.position.startRow, g.position.startCol
 	}
 }
 
-func initialise() {
-	cbTerm := exec.Command("stty", "cbreak", "-echo")
-	cbTerm.Stdin = os.Stdin
+var pillTimer *time.Timer
 
-	err := cbTerm.Run()
-	if err != nil {
-		log.Fatalln("unable to activate cbreak mode:", err)
+// Funcion que activa el poder del poder
+func power() {
+	pillMx.Lock()
+	updateEnemies(enemies, EnemyStatusBlue)
+	if pillTimer != nil {
+		pillTimer.Stop()
+	}
+	pillTimer = time.NewTimer(time.Second * cfg.PillDurationSecs)
+	pillMx.Unlock()
+	//canal para el timer
+	<-pillTimer.C
+	pillMx.Lock()
+	pillTimer.Stop()
+	updateEnemies(enemies, EnemyStatusNormal)
+	pillMx.Unlock()
+}
+
+func moveEnemies() {
+	for _, g := range enemies {
+		dir := enemyMoveListDirection()
+		g.position.row, g.position.col = move(g.position.row, g.position.col, dir)
 	}
 }
 
-func cleanup() {
+func showCounter(wait int) {
+	for i := 0; i < wait; i++ {
+		time.Sleep(750 * time.Millisecond)
+		fmt.Println("RESTARTING in " + strconv.Itoa(3-i) + " seconds")
+	}
+}
+
+func cleanTerminal() {
 	cookedTerm := exec.Command("stty", "-cbreak", "echo")
 	cookedTerm.Stdin = os.Stdin
 
@@ -317,14 +291,47 @@ func cleanup() {
 		log.Fatalln("unable to activate cooked mode:", err)
 	}
 }
-
-func printCounter(wait int){
-	for i:= 0; i< wait; i++{
-		time.Sleep(750 * time.Millisecond)
-		fmt.Println("RESTARTING in " + strconv.Itoa(3-i) + " seconds")
+func printScreen() {
+	simpleansi.ClearScreen()
+	for _, line := range maze_level {
+		for _, chr := range line {
+			switch chr {
+			case '#':
+				fmt.Print(simpleansi.WithBlueBackground(cfg.Wall))
+			case '.':
+				fmt.Print(cfg.Dot)
+			case 'X':
+				fmt.Print(cfg.Pill)
+			default:
+				fmt.Print(cfg.Space)
+			}
+		}
+		fmt.Println()
 	}
-}
 
+	moveCursor(player.row, player.col)
+	fmt.Print(cfg.Player)
+
+	enemiesStatusMx.RLock()
+	for _, g := range enemies {
+		moveCursor(g.position.row, g.position.col)
+		if g.status == EnemyStatusNormal {
+			fmt.Printf(cfg.Ghost)
+		} else if g.status == EnemyStatusBlue {
+			fmt.Printf(cfg.GhostBlue)
+		}
+	}
+	enemiesStatusMx.RUnlock()
+
+	moveCursor(len(maze_level)+1, 0)
+
+	livesRemaining := strconv.Itoa(lives) //converts lives int to a string
+	if cfg.UseEmoji {
+		livesRemaining = showLives()
+	}
+
+	fmt.Println("Score:", score, "\tlives:", livesRemaining)
+}
 
 func main() {
 	flag.Parse()
@@ -338,98 +345,95 @@ func main() {
 		os.Exit(1)
 	}
 	if numenemy > 0 && numenemy < 13 {
-	// initialize game
-	initialise()
-	defer cleanup()
+		// se inicia el juego
+		initialiseGame()
+		defer cleanTerminal()
 
-	// load resources
-	err := loadMaze(*mazeFile,numenemy)
-	if err != nil {
-		log.Println("failed to load maze:", err)
-		return
-	}
+		//Se lee el mapa y el juego
+		err := loadLevelMap(*mazeFile, numenemy)
+		if err != nil {
+			log.Println("failed to load maze:", err)
+			return
+		}
 
-	err = loadConfig(*configFile)
-	if err != nil {
-		log.Println("failed to load configuration:", err)
-		return
-	}
+		err = loadGame(*configFile)
+		if err != nil {
+			log.Println("failed to load configuration:", err)
+			return
+		}
 
-	// process input (async)
-	input := make(chan string)
-	go func(ch chan<- string) {
+		//se crea el canal para el input, el movimiento del jugador
+		input := make(chan string)
+		go func(ch chan<- string) {
+			for {
+				input, err := readInput()
+				if err != nil {
+					log.Print("error reading input:", err)
+					ch <- "ESC"
+				}
+				ch <- input
+			}
+		}(input)
 		for {
-			input, err := readInput()
-			if err != nil {
-				log.Print("error reading input:", err)
-				ch <- "ESC"
+			//Se usa un canal para el movimiento del jugador
+			select {
+			case inp := <-input:
+				if inp == "ESC" {
+					lives = 0
+				}
+				movePlayer(inp)
+			default:
 			}
-			ch <- input
-		}
-	}(input)
-
-	// game loop
-	for {
-		// process movement
-		select {
-		case inp := <-input:
-			if inp == "ESC" {
-				lives = 0
-			}
-			movePlayer(inp)
-		default:
-		}
-
-		moveGhosts()
-
-		// process collisions
-		for _, g := range ghosts {
-			if player.row == g.position.row && player.col == g.position.col {
-				ghostsStatusMx.RLock()
-				if g.status == GhostStatusNormal {
-					lives = lives - 1
-					if lives != 0 {
-						moveCursor(player.row, player.col)
-						fmt.Print(cfg.Death)
-						moveCursor(len(maze)+2, 0)
-						ghostsStatusMx.RUnlock()
-						updateGhosts(ghosts, GhostStatusNormal)
-						go printCounter(3)
-						time.Sleep(3000 * time.Millisecond) //dramatic pause before reseting player position
-						player.row, player.col = player.startRow, player.startCol
+			moveEnemies()
+			// SE Checa las colisiones entre enemigo y jugador
+			for _, g := range enemies {
+				if player.row == g.position.row && player.col == g.position.col {
+					enemiesStatusMx.RLock()
+					if g.status == EnemyStatusNormal {
+						lives = lives - 1
+						if lives != 0 {
+							moveCursor(player.row, player.col)
+							fmt.Print(cfg.Death)
+							moveCursor(len(maze_level)+2, 0)
+							enemiesStatusMx.RUnlock()
+							updateEnemies(enemies, EnemyStatusNormal)
+							go showCounter(3)
+							time.Sleep(3000 * time.Millisecond)
+							player.row, player.col = player.startRow, player.startCol
+						}
+					} else if g.status == EnemyStatusBlue {
+						enemiesStatusMx.RUnlock()
+						updateEnemies([]*enemieStruct{g}, EnemyStatusNormal)
+						g.position.row, g.position.col = g.position.startRow, g.position.startCol
 					}
-				} else if g.status == GhostStatusBlue {
-					ghostsStatusMx.RUnlock()
-					updateGhosts([]*ghost{g}, GhostStatusNormal)
-					g.position.row, g.position.col = g.position.startRow, g.position.startCol
 				}
 			}
-		}
-		//clear terminal
-		fmt.Print("\033[H\033[2J")
-		// update screen
-		printScreen()
+			//Se limpia la terminal
+			fmt.Print("\033[H\033[2J")
+			// Se actualiza la terminal con todo movido
+			printScreen()
 
-		// check game over
-		if numDots == 0 || lives <= 0 {
-			if lives == 0 {
-				moveCursor(player.row, player.col)
-				fmt.Print(cfg.Death)
-				moveCursor(player.startRow, player.startCol-1)
-				fmt.Print("GAME OVER")
-				moveCursor(len(maze)+2, 0)
+			//Checa si quedan vidas
+			if numDots == 0 || lives <= 0 {
+				if lives == 0 {
+					moveCursor(player.row, player.col)
+					fmt.Print(cfg.Death)
+					moveCursor(player.startRow, player.startCol-1)
+					fmt.Print("GAME OVER")
+					moveCursor(len(maze_level)+2, 0)
+				}
+				//Si ya no hay puntos se gana el juego
+				if numDots == 0 {
+					fmt.Println("You Win")
+				}
+				break
 			}
-			if numDots == 0{
-				fmt.Println("Victory")
-			}
-			break
-		}
 
-		// repeat
-		time.Sleep(200 * time.Millisecond)
-	}
-	}else{
-		fmt.Println("El numero de fantaasmas debe de ser entre 1 a 12")
+			// repeat
+			time.Sleep(200 * time.Millisecond)
+		}
+	} else {
+		fmt.Println("El numero de fantasmas debe de ser entre 1 a 12")
 		os.Exit(1)
 	}
 

@@ -385,12 +385,16 @@ func main() {
 			default:
 			}
 			moveEnemies()
-			// SE Checa las colisiones entre enemigo y jugador
+			// Se Checa las colisiones entre enemigo y jugador
 			for _, g := range enemies {
 				if player.row == g.position.row && player.col == g.position.col {
 					enemiesStatusMx.RLock()
 					if g.status == EnemyStatusNormal {
 						lives = lives - 1
+						for _,en := range enemies{
+							en.position.row = en.position.startRow
+							en.position.col = en.position.startCol
+						}
 						if lives != 0 {
 							moveCursor(player.row, player.col)
 							fmt.Print(cfg.Death)
@@ -410,6 +414,7 @@ func main() {
 			}
 			//Se limpia la terminal
 			fmt.Print("\033[H\033[2J")
+
 			// Se actualiza la terminal con todo movido
 			printScreen()
 

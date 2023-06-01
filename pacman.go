@@ -229,7 +229,7 @@ func movePlayer(dir string) {
 	}
 }
 func enemyMoveListDirection() string {
-	dir := rand.Intn(8)
+	dir := rand.Intn(4)
 	move := map[int]string{
 		0: "UP",
 		1: "DOWN",
@@ -362,7 +362,7 @@ func main() {
 			return
 		}
 
-		//se crea el canal para el input, el movimiento del jugador
+		//se crea un loop infinito que recibe un input y se manda al canal canal para cualquier input , el movimiento del jugador
 		input := make(chan string)
 		go func(ch chan<- string) {
 			for {
